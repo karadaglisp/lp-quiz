@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fang Facts - LifePulse</title>
+  
+  <!-- Tailwind CSS για Design -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Γραμματοσειρά Comfortaa (LifePulse Brand) -->
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Εικονίδια (Lucide) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    const __firebase_config = JSON.stringify({
+      apiKey: "AIzaSyC-owoZBYE-uKLketdCmqkDj54FrQUbX40",
+      authDomain: "fang-facts.firebaseapp.com",
+      projectId: "fang-facts",
+      storageBucket: "fang-facts.firebasestorage.app",
+      messagingSenderId: "32058564368",
+      appId: "1:32058564368:web:19d6ee74cc59d7b6104f95"
+      });
+    const __app_id = "fang-facts-quiz"; // Ένα μοναδικό ID για να αποθηκεύει τα δεδομένα σωστά
+  </script>
+
+  <style>
+    body { font-family: 'Comfortaa', sans-serif; }
+    @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+    .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+    @keyframes pulse-fast { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .8; transform: scale(1.05); } }
+    .animate-pulse-fast { animation: pulse-fast 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    
+    /* Animation για το background των χαρακτήρων */
+    @keyframes float {
+      0% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-15px) rotate(3deg); }
+      100% { transform: translateY(0px) rotate(0deg); }
+    }
+    .floating-char {
+      animation: float 8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body id="main-body" class="transition-colors duration-500 flex flex-col min-h-screen overflow-x-hidden bg-[#330f25]">
+
+  <!-- ΔΙΑΚΟΣΜΗΤΙΚΟ BACKGROUND ΜΕ ΤΟΥΣ ΧΑΡΑΚΤΗΡΕΣ LIFEPULSE -->
+  <div id="decorative-bg" class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+    <img src="Artboard 1 1.png" class="absolute top-[5%] -left-[5%] w-24 md:w-40 opacity-20 floating-char" style="animation-delay: 0s;" alt="">
+    <img src="Rh su 1.png" class="absolute bottom-[5%] left-[5%] w-32 md:w-48 opacity-20 floating-char" style="animation-delay: -2s; animation-direction: reverse;" alt="">
+    <img src="αρχική 5.png" class="absolute top-[10%] -right-[5%] w-28 md:w-44 opacity-20 floating-char" style="animation-delay: -4s;" alt="">
+    <img src="δονατιον σθ 1.png" class="absolute bottom-[10%] -right-[2%] w-32 md:w-48 opacity-20 floating-char" style="animation-delay: -1s; animation-direction: reverse;" alt="">
+    <img src="rhesy.png" class="absolute top-[40%] left-[2%] w-20 md:w-32 opacity-20 floating-char" style="animation-delay: -3s;" alt="">
+    <img src="τοποθεσία su 1.png" class="absolute top-[50%] right-[2%] w-24 md:w-36 opacity-20 floating-char" style="animation-delay: -5s; animation-direction: reverse;" alt="">
+    <img src="recover su 2.png" class="absolute -bottom-[5%] left-[40%] w-28 md:w-40 opacity-20 floating-char" style="animation-delay: -2.5s;" alt="">
+    <img src="sign in 1.png" class="absolute -top-[5%] left-[30%] w-24 md:w-36 opacity-20 floating-char" style="animation-delay: -6s; animation-direction: reverse;" alt="">
+    <img src="feedback 2.png" class="absolute top-[30%] left-[50%] -translate-x-1/2 w-48 md:w-64 opacity-[0.08] floating-char" style="animation-delay: -7s;" alt="">
+    <img src="password forget 1.png" class="absolute top-[70%] left-[25%] w-24 md:w-36 opacity-20 floating-char" style="animation-delay: -1.5s;" alt="">
+  </div>
+
+  <!-- ΣΤΑΘΕΡΟΣ PLAYER ΗΧΟΥ (Τοποθετείται δυναμικά μέσα στον καμβά) -->
+  <audio id="persistent-audio" controls class="hidden"></audio>
+
+  <!-- ΚΕΝΤΡΙΚΟ CONTAINER ΕΦΑΡΜΟΓΗΣ -->
+  <div id="app" class="flex-grow flex flex-col w-full h-full relative z-10">
+    <div class="min-h-screen flex items-center justify-center text-white w-full relative z-10">Φόρτωση...</div>
+  </div>
+
+  <script type="module">
+    // --- FIREBASE IMPORTS ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- SETUP ---
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    const ADMIN_SECRET = "LifePulse2026"; // Κωδικός για τον Editor & Host
+
+    // --- LifePulse Brand Colors & Image Placeholders ---
+    const COLORS = [
+      'bg-[#7F265B]', // Α απάντηση
+      'bg-[#10B981]', // Β απάντηση
+      'bg-[#F19821]', // Γ απάντηση
+      'bg-[#2A48B2]'  // Δ απάντηση
+    ];
+    const HOVER_COLORS = [
+      'hover:bg-[#661e49]', 
+      'hover:bg-[#059669]', 
+      'hover:bg-[#d97706]', 
+      'hover:bg-[#1e3a8a]'  
+    ];
+    const SHAPE_IMAGES = [
+      'knife.png', 
+      'hawk.png', 
+      'rhesy_lick.png', 
+      'juice.png'
+    ];
+
+    // --- DEFAULT DATA (ΟΙ ΕΡΩΤΗΣΕΙΣ ΣΟΥ ΑΠΟ ΤΟ EXCEL) ---
+    const DEFAULT_QUIZ_DATA = [
+      { type: 'phase_intro', title: 'Φάση 1', subtitle: 'Pop Culture 🎬' },
+      { type: 'question', text: 'Στον "Ματωμένο Γάμο του Λόρκα" τι συμβολίζει το αίμα που χύνεται στο τέλος της τραγωδίας;', options: ['Την κάθαρση και την συμφιλίωση των χαρακτήρων μέσω της θυσίας', 'Το αναπόφευκτο του πεπρωμένου και το βίαιο τίμημα του απαγορευμένου πάθους', 'Την οριστική ρήξη των δεσμών ανάμεσα στις δύο αντίπαλες οικογένειες', 'Μια διαφήμιση για εθελοντική αιμοδοσία που μπήκε κατά λάθος στην τελευταία πράξη'], correct: 1, time: 25 },
+      { type: 'question', text: 'Από τι φτιάχνεται συνήθως το ψεύτικο αίμα (fake blood) στις περισσότερες ταινίες του Χόλιγουντ σήμερα; 🎬', options: ['Σιρόπι καλαμποκιού και κόκκινο χρώμα', 'Κέτσαπ (κλασικό, φθηνό και αγαπημένο)', 'Σιρόπι γρεναδίνης', 'Χυμό ντομάτας'], correct: 0, time: 20 },
+      { type: 'question', text: 'Το 2019 προστέθηκε στα πληκτρολόγιά μας το emoji με τη "σταγόνα αίματος" 🩸. Για ποιο λόγο έγινε κυρίως η καμπάνια για να μπει; 📱', options: ['Για να "σπάσει" το ταμπού γύρω από την έμμηνο ρύση', 'Για τους φανς των ταινιών τρόμου 👻', 'Για να δείχνουμε ότι κόψαμε το δάχτυλό μας με χαρτί 📄', 'Ήταν μια χορηγία του Ερυθρού Σταυρού 🏥'], correct: 2, time: 20 },
+      { type: 'question', text: 'Τι χρώμα ήταν το αίμα του Πετρέλη στο αντίστοιχο τραγούδι; ', options: ['Κόκκινο', 'Μπλε', 'Της αγάπης', 'Του ουρανού'], correct: 3, time: 20 },
+      { type: 'question', text: 'Στην ταινία " Οι Πειρατές της Καραϊβικής: Η κατάρα του Μαύρου Μαργαριταριού", τι χρειάζεται για να λυθεί η κατάρα του θυσαυρού των Αζτέκων; 🪙 ', options: ['Να γίνει μαι θυσία αίματος από έναν αθώο στην άκρη του κόσμου', 'Να υπογραφεί όρκος αίματος ανάμεσα στους πειρατές και στο Βρετανικό ναυτικό', 'Να προσφερθεί το αίμα του κλέφτη (ή απογόνου του) ενώ είναι όλα τα νομίσματα του θυσαυρού παρόντα', 'Να πιουν οι πειρατές το αίμα μιας γοργόνας'], correct: 2, time: 20 },
+      { type: 'question', text: 'Σε ποιο διάσημο τραγούδι της η Taylor Swift αναφέρεται σε προδοσία από άλλη pop star;  🎤', options: ['Bad Blood', 'Bloodline', 'Bleeding Love', 'Blood sweat & tears '], correct: 0, time: 20 },
+      { type: 'question', text: 'Στα MTV VMA του 2009, ποια pop star σοκάρισε το κοινό όταν κρεμάστηκε στη σκηνή καλυμμένη με ψεύτικο αίμα κατά την εκτέλεση του "Paparazzi"; 📸', options: ['Lady Gaga', 'Madonna', 'Britney Spears', 'Katy Perry'], correct: 0, time: 20 },
+
+      { type: 'leaderboard' },
+      
+      { type: 'phase_intro', title: 'ETOIMOIIIIIIII; 🎤', subtitle: '' },
+      { type: 'phase_intro', title: 'Mini-Game 🎮', subtitle: 'Μέρος 1ο: Συμπλήρωσε το Τραγούδι! 🎙️' },
+      { type: 'media', title: 'Συμπλήρωσε τους στίχους', audioUrl: 'fill-song1.mp3#t=57,76' },
+      { type: 'media', title: 'ΤΡΑΓΟΥΔΑ ΑΥΤΟ ΤΟ ΑΡΙΣΤΟΥΡΓΗΜΑ!', audioUrl: 'fill-song2.mp3#t=57,83' },
+      { type: 'media', title: 'Αφιερωμένο στον/στην πρώην σου.', audioUrl: 'fill-song3.mp3#t=66,90' },
+      { type: 'media', title: 'Queen 👑', audioUrl: 'fill-song4.mp3#t=29,50' },
+      { type: 'media', title: 'ΕΓΩ ΣΤΗΝ Α ΓΥΜΝΑΣΙΟΥ ΕΠΕΙΔΗ Η ΝΙΚΟΛΕΤΑ ΔΕΝ ΑΠΑΝΤΟΥΣΕ ΣΤΑ ΡΑΒΑΣΑΚΙΑ', audioUrl: 'fill-song5.mp3#t=55,73' },
+
+      { type: 'phase_intro', title: 'Mini-Game 🎮', subtitle: 'Μέρος 2ο: Βρες το Τραγούδι! 🎵' },
+      { type: 'media', title: 'Ποιο είναι αυτό το τραγούδι; 😮‍💨', audioUrl: 'find-song1.mp3#t=41,57' },
+      { type: 'media', title: 'Ε ΔΕ ΓΙΝΕΤΑΙ ΝΑ ΜΗΝ ΤΟ ΞΕΣ', audioUrl: 'find-song2.mp3#t=0,35' },
+      { type: 'media', title: 'Για ψαγμένους', audioUrl: 'find-song3.mp3#t=93,120' },
+      { type: 'media', title: 'Για πολύ, ΠΑΡΑ ΠΟΛΥ, ψαγμένους', audioUrl: 'find-song4.mp3#t=0,60' },
+      
+      { type: 'leaderboard' },
+      
+      { type: 'phase_intro', title: 'Φάση 2', subtitle: 'Αιμοδοσία 🩸' },
+      { type: 'question', text: 'Αν αφαιρέσουμε τα κύτταρα, τι χρώμα έχει το πλάσμα του αίματος; 🧪', options: ['Κόκκινο, αφού δίνει στο αίμα το χαρακτηριστικό του χρώμα', 'Διάφανο, σαν το νερό', 'Πράσινο φωσφοριζέ (ραδιενεργό)', 'Υποκίτρινο (σαν χαμομήλι)'], correct: 3, time: 20 },
+      { type: 'question', text: 'Πόσες φορές χτυπάει η καρδιά μας μέσα σε μία μέρα για να στείλει το αίμα παντού; 🥁', options: ['Περίπου 100.000 φορές', '500 φορές (βαριέται λίγο η δικιά μου) ', 'Εξαρτάται πόσες φορές θα δω το crush μου', 'Περίπου 1 εκατομμύριο φορές '], correct: 0, time: 20 },
+      { type: 'question', text: 'Πώς επηρεάζει η μικροβαρύτητα το αίμα των αστροναυτών στις διαστημικές πτήσεις;', options: ['Καταστρέφονται περισσότερα ερυθρά αιμοσφαίρια', 'Δημιουργούνται φυσαλίδες στον όγκο του αίματος', 'Δεν αλλάζει τίποτα (ή Τα ερυθρά μετατρέπονται σε λευκά αιμοσφαίρια)', 'Αλλάζει το χρώμα του αίματος σε ροζ '], correct: 0, time: 20 },
+      { type: 'question', text: 'Εκτός από "ολόκληρο αίμα", τι άλλο μπορείς να δωρίσεις (μέσω μιας διαδικασίας που λέγεται αφαίρεση); 🔄', options: ['Μυελό των οστών', 'Αιμοπετάλια ή πλάσμα', 'Μόνο αιμοπετάλια', 'Λευκά αιμοσφαίρια '], correct: 1, time: 20 },
+      { type: 'question', text: 'Ποια είναι η επίσημη ιατρική οδηγία για τις γυναίκες που επιθυμούν να δώσουν αίμα κατά τη διάρκεια της περιόδου τους;', options: ['Επιτρέπεται μόνο εάν η αιμοδοσία γίνει την πρώτη ημέρα της περιόδου, όταν η απώλεια αίματος είναι ακόμα μικρή', 'Επιτρέπεται κανονικά, αρκεί η αιμοδότρια να αισθάνεται καλά και τα επίπεδα αιμοσφαιρίνης της να είναι εντός ορίων', 'Απαγορεύεται αυστηρά για όλο το διάστημα της εμμήνου ρύσεως λόγω κινδύνου μόλυνσης του αίματος', 'Απαιτείται ειδική άδεια από γυναικολόγο και υποχρεωτική λήψη συμπληρώματος σιδήρου για μία εβδομάδα πριν'], correct: 1, time: 20 },
+      { type: 'question', text: 'Γιατί οι μεταγγίσεις στα νεογνά (<4 μηνών) απαιτούν ιδιαίτερη προσοχή;', options: ['Το ανοσοποιητικό τους σύστημα είναι ανώριμο και πολλά αντισώματα είναι μητρικής προέλευσης', 'Αλλάζει συχνά η ομάδα αίματός τους', 'Δεν έχουν ακόμη ερυθρά αιμοσφαίρια', 'Το Rh εμφανίζεται μετά τους 6 μήνες'], correct: 0, time: 20 },
+      { type: 'question', text: 'Ποιος συνδυασμός ομάδων χρειάζεται ιδιαίτερη παρακολούθηση κατά την εγκυμοσύνηη για την αποφυγή καταστροφής των ερυθρών κυττάρων του εμβρύου;', options: ['ΑΒ+ μητέρα / Α+ έμβρυο', '0- μητέρα / Πατέρας βρικόλακας', 'Rh- μητέρα / Rh+ έμβρυο', 'Rh+ μητέρα / Rh+ πατέρας'], correct: 2, time: 20 },
+      { type: 'question', text: 'Τι υποστήριζε η λαϊκή δοξασία για τις γυναίκες κατά τη διάρκεια της περιόδου σε σχέση με το ζύμωμα του ψωμιού; 🍞', options: ['Το ψωμί μπορεί να ξινίσει', 'Πως το ψωμί θα γίνει κόκκινο', 'Πως θα φέρει καλή τύχη στην οικογένεια', 'Ότι πρέπει να φάνε το ψωμί μόνες τους'], correct: 0, time: 20 },
+      
+      { type: 'leaderboard' },
+      
+      { type: 'phase_intro', title: '🧛🧛🧛', subtitle: '' },
+      { type: 'phase_intro', title: 'Mini-Game 🎮', subtitle: 'Drink ̶b̶l̶o̶o̶d̶  juice, bite a̶ ̶n̶e̶c̶k̶ some snacks' },
+      { type: 'media', title: '🧛🧛🧛', audioUrl: 'mini-game-2.mp3' },
+
+      { type: 'phase_intro', title: 'Φάση 3', subtitle: 'Φύση & Ζωικό Βασίλειο 🐾' },
+      { type: 'question', text: 'Σε ποιο φαινόμενο αναφερόμαστε όταν μιλάμε για το "ματωμένο φεγγάρι";', options: ['Στοχεύουμε με κόκκινο laser το φεγγάρι', 'Στον αντικατοπτρισμό του φεγγαριού στην ερυθρά θάλασσα', 'Όταν ένα τζάγκουαρ δαγκώνει το φεγγάρι', 'Στην ολική έκλειψη σελήνης με πανσέληνο '], correct: 3, time: 20 },
+      { type: 'question', text: 'Ποιο ζώο έχει τη μεγαλύτερη καρδιά, με βάρος που φτάνει τα 180 κιλά;', options: ['Η γαλάζια φάλαινα', 'Ο ελέφαντας', 'Ο κροκόδειλος', 'Ο φαλαινοκαρχαρίας'], correct: 0, time: 20 },
+      { type: 'question', text: 'Πώς καταφέρνουν τα κουνούπια να πίνουν αίμα χωρίς αυτό να πήζει μέσα στη προβοσκίδα τους; 🦟', options: ['Το σάλιο τους περιέχει φυσικές αντιπηκτικές ουσίες', 'Το αίμα μας είναι ήδη αρκετά αραιό', 'Η προβοσκίδα τους βυθίζεται αρκετά βαθιά, ώστε να μην υπάρχει αυτός ο κίνδυνος', 'Πίνουν μόνο το πλάσμα, το οποίο δεν πήζει'], correct: 0, time: 20 },
+      { type: 'question', text: 'Τι χρώμα αίμα έχουν τα χταπόδια; 🐙', options: ['Κόκκινο duh;', 'Μπλε (είναι γαλαζοαίματα)', 'Μαύρο, όπως η ψυχή μου', 'Δεν έχουν καν αίμα'], correct: 1, time: 20 },      
+      { type: 'question', text: 'Ο παράγοντας Rhesus (θετικό/αρνητικό στην ομάδα αίματος) πήρε το όνομά του από:', options: ['Τον Ελβετό επιστήμονα Dr. Hans Rhesus', 'Ένα είδος μαϊμούς που χρησιμοποιήθηκε σε μελέτες μετάγγισης αίματος σε κουνέλια', 'Το είδος γουρουνιών Rheysius rubea, γνωστό για το πόσο κοντινή είναι η φυσιολογία του αίματος του με το ανθρώπινο', 'Τον Ρωμαίο γιατρό Aetius Rhesus, που θεωρείται συνεχιστής του Ιπποκράτη'], correct: 1, time: 20 },
+      { type: 'question', text: 'Πόσες ομάδες αίματος έχουν οι γάτες;', options: ['8, όπως και οι άνθρωποι', '1, λέγεται ομάδα αίματος Γ', '3: A, B, AB ', '7, όσες και οι ζωές τους'], correct: 2, time: 20 },
+      { type: 'question', text: 'Ποια είναι η βασική προϋπόθεση για να γίνει ένας σκύλος εθελοντής αιμοδότης;', options: ['Να έχει πάρει μέρος σε τουλάχιστον μία έκθεση μορφολογίας', 'Να ανήκει σε συγκεκριμένη ράτσα (Golden Retriever)', 'Να είναι πάνω από 25 κιλά και υγιής', 'Να είναι κάτω από 1 έτους'], correct: 2, time: 20 },
+
+    ];
+
+    // --- GLOBAL STATE ---
+    const state = {
+      user: null,
+      authReady: false,
+      view: 'home', // home, host, player, editor
+      gamePin: '',
+      gameDoc: null,
+      quizData: [],
+      errorMsg: '',
+      playerName: '',
+      showAdminModal: false,
+      adminPass: '',
+      adminError: '',
+      saveMessage: '',
+      adminPendingAction: null,
+      exportText: '' // Προσθήκη state για την Εξαγωγή
+    };
+
+    let unsubscribeGame = null;
+    let hostTimerInterval = null;
+    let playerTimerInterval = null;
+
+    // --- HELPERS ---
+    const escapeHtml = (str) => String(str||'').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
+    // --- INITIALIZATION ---
+    async function init() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+        state.errorMsg = "Σφάλμα σύνδεσης.";
+        renderFull();
+      }
+
+      onAuthStateChanged(auth, async (user) => {
+        state.user = user;
+        if (user) {
+          state.authReady = true;
+          try {
+            const templateRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'quiz_template');
+            const snap = await getDoc(templateRef);
+            if (snap.exists() && snap.data().items && snap.data().items.length > 0) {
+              state.quizData = snap.data().items;
+            } else {
+              state.quizData = JSON.parse(JSON.stringify(DEFAULT_QUIZ_DATA));
+            }
+          } catch (e) {
+            state.quizData = JSON.parse(JSON.stringify(DEFAULT_QUIZ_DATA));
+          }
+          renderFull();
+        }
+      });
+    }
+
+    // --- FIREBASE GAME LISTENER ---
+    function listenToGame() {
+      if (unsubscribeGame) unsubscribeGame();
+      if (!state.gamePin || state.view === 'home' || state.view === 'editor') return;
+
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin);
+      unsubscribeGame = onSnapshot(gameRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const newData = docSnap.data();
+          const needsFullRender = !state.gameDoc || state.gameDoc.status !== newData.status || state.gameDoc.currentStepIndex !== newData.currentStepIndex;
+          state.gameDoc = newData;
+          
+          if (needsFullRender) renderFull();
+          else updateGranular();
+        } else {
+          state.errorMsg = "Το παιχνίδι δεν βρέθηκε ή τερματίστηκε.";
+          state.view = 'home';
+          state.gameDoc = null;
+          renderFull();
+        }
+      }, (err) => console.error("Firestore error:", err));
+    }
+
+    // --- ACTION HANDLERS (EXPOSED TO WINDOW) ---
+    window.actions = {
+      setGamePin: (e) => { state.gamePin = e.target.value; },
+      setPlayerName: (e) => { state.playerName = e.target.value; },
+      setAdminPass: (e) => { state.adminPass = e.target.value; },
+      
+      joinGame: async (e) => {
+        e.preventDefault();
+        state.errorMsg = '';
+        if (!state.gamePin || !state.playerName) {
+          state.errorMsg = "Συμπληρώστε PIN και Όνομα.";
+          renderFull(); return;
+        }
+        try {
+          const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin);
+          const snap = await getDoc(gameRef);
+          if (!snap.exists()) {
+            state.errorMsg = "Δεν βρέθηκε παιχνίδι με αυτό το PIN.";
+            renderFull(); return;
+          }
+          
+          const gameData = snap.data();
+          gameData.players = gameData.players || {};
+          gameData.players[state.user.uid] = { name: state.playerName, score: 0, currentAnswer: -1, answerTime: 0 };
+          
+          await updateDoc(gameRef, { [`players.${state.user.uid}`]: gameData.players[state.user.uid] });
+          
+          state.gameDoc = gameData;
+          state.view = 'player';
+          listenToGame();
+          renderFull();
+        } catch (err) {
+          state.errorMsg = "Σφάλμα σύνδεσης στο παιχνίδι.";
+          renderFull();
+        }
+      },
+
+      executeCreateGame: async () => {
+        state.errorMsg = '';
+        const pin = Math.floor(1000 + Math.random() * 9000).toString();
+        const newGame = {
+          pin, hostUid: state.user.uid, status: 'lobby', currentStepIndex: -1,
+          questionEndTime: 0, questionStartTime: 0, players: {} 
+        };
+        try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', pin), newGame);
+          state.gamePin = pin;
+          state.gameDoc = newGame;
+          state.view = 'host';
+          listenToGame();
+          renderFull();
+        } catch (err) {
+          state.errorMsg = "Αποτυχία δημιουργίας παιχνιδιού.";
+          renderFull();
+        }
+      },
+
+      hostNextStep: async () => {
+        if (!state.gameDoc) return;
+        const nextIndex = state.gameDoc.currentStepIndex + 1;
+        const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin);
+        if (nextIndex >= state.quizData.length) {
+          await updateDoc(gameRef, { status: 'end' });
+          return;
+        }
+        const nextStepData = state.quizData[nextIndex];
+        const updates = { currentStepIndex: nextIndex, status: 'active' };
+
+        if (nextStepData.type === 'question') {
+          updates.questionStartTime = Date.now();
+          updates.questionEndTime = Date.now() + ((nextStepData.time || 20) * 1000);
+          Object.keys(state.gameDoc.players || {}).forEach(uid => {
+            updates[`players.${uid}.currentAnswer`] = -1;
+            updates[`players.${uid}.answerTime`] = 0;
+          });
+        }
+        await updateDoc(gameRef, updates);
+      },
+
+      hostShowAnswer: async () => {
+        if (!state.gameDoc) return;
+        const currentStep = state.quizData[state.gameDoc.currentStepIndex];
+        if (currentStep.type !== 'question') return;
+        
+        const updates = { status: 'answer' };
+        Object.entries(state.gameDoc.players || {}).forEach(([uid, pData]) => {
+          if (pData.currentAnswer === currentStep.correct) {
+            const timeTaken = pData.answerTime - state.gameDoc.questionStartTime;
+            const totalTime = state.gameDoc.questionEndTime - state.gameDoc.questionStartTime;
+            const timeRatio = Math.max(0, 1 - (timeTaken / totalTime));
+            const points = 500 + Math.round(500 * timeRatio);
+            updates[`players.${uid}.score`] = pData.score + points;
+          }
+        });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin), updates);
+      },
+
+      submitAnswer: async (idx) => {
+        if (state.view !== 'player' || !state.gameDoc) return;
+        const myData = state.gameDoc.players[state.user.uid];
+        if (myData && myData.currentAnswer !== -1) return; 
+
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin), {
+          [`players.${state.user.uid}.currentAnswer`]: idx,
+          [`players.${state.user.uid}.answerTime`]: Date.now()
+        });
+      },
+
+      openAdminModal: (actionType = 'editQuiz') => { 
+        state.adminPendingAction = actionType;
+        state.showAdminModal = true; 
+        state.adminError = ''; 
+        renderFull(); 
+      },
+      closeAdminModal: () => { 
+        state.showAdminModal = false; 
+        renderFull(); 
+      },
+      verifyAdmin: () => {
+        if (state.adminPass === ADMIN_SECRET) {
+          state.showAdminModal = false; 
+          state.adminPass = ''; 
+          state.adminError = '';
+          
+          if (state.adminPendingAction === 'createGame') {
+            window.actions.executeCreateGame();
+          } else {
+            state.view = 'editor'; 
+            renderFull();
+          }
+        } else {
+          state.adminError = 'Λάθος κωδικός πρόσβασης!'; 
+          renderFull();
+        }
+      },
+      checkEnter: (e) => { if(e.key === 'Enter') window.actions.verifyAdmin(); },
+      goToLobby: () => { state.view = 'host'; renderFull(); },
+      
+      saveQuiz: async () => {
+        try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'quiz_template'), { items: state.quizData });
+          state.saveMessage = 'Αποθηκεύτηκε επιτυχώς!';
+          renderFull();
+          setTimeout(() => { state.saveMessage = ''; renderFull(); }, 3000);
+        } catch (err) {
+          state.saveMessage = 'Σφάλμα αποθήκευσης.'; renderFull();
+        }
+      },
+      exportQuizData: () => {
+        const dataStr = JSON.stringify(state.quizData, null, 2);
+        state.exportText = `const DEFAULT_QUIZ_DATA = ${dataStr};`;
+        renderFull();
+      },
+      closeExportModal: () => {
+        state.exportText = '';
+        renderFull();
+      },
+      copyExportText: () => {
+        const ta = document.getElementById('export-textarea');
+        ta.select();
+        document.execCommand('copy');
+        document.getElementById('copy-btn').innerText = 'Αντιγράφηκε!';
+      },
+      updateItemField: (idx, field, val) => { state.quizData[idx][field] = val; },
+      updateItemOption: (qIdx, optIdx, val) => { state.quizData[qIdx].options[optIdx] = val; },
+      updateItemCorrect: (qIdx, val) => { state.quizData[qIdx].correct = val; renderFull(); },
+      moveItem: (idx, dir) => {
+        if (idx + dir < 0 || idx + dir >= state.quizData.length) return;
+        const temp = state.quizData[idx];
+        state.quizData[idx] = state.quizData[idx + dir];
+        state.quizData[idx + dir] = temp;
+        renderFull();
+      },
+      deleteItem: (idx) => { state.quizData.splice(idx, 1); renderFull(); },
+      insertItemAfter: (idx, type) => {
+        const newItem = { type };
+        if (type === 'question') {
+          newItem.text = 'Νέα Ερώτηση'; newItem.options = ['Επιλογή 1', 'Επιλογή 2', 'Επιλογή 3', 'Επιλογή 4']; newItem.correct = 0; newItem.time = 20;
+        } else if (type === 'phase_intro') {
+          newItem.title = 'Νέα Φάση'; newItem.subtitle = 'Περιγραφή';
+        } else if (type === 'media') {
+          newItem.title = 'Διάλειμμα'; newItem.audioUrl = '';
+        }
+        state.quizData.splice(idx + 1, 0, newItem);
+        renderFull();
+      }
+    };
+
+
+    // --- RENDER LOGIC ---
+
+    function getLeaderboardHtml(players, isEnd, isHost) {
+      const sorted = Object.values(players).sort((a, b) => b.score - a.score).slice(0, 3);
+      let html = `<div class="w-full max-w-3xl text-center bg-white p-6 md:p-8 rounded-3xl shadow-xl mx-auto my-8 relative z-10">
+        <i data-lucide="trophy" class="w-16 h-16 text-yellow-500 mx-auto mb-4"></i>
+        <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-8">${isEnd ? 'Τελική Βαθμολογία!' : 'Top 3'}</h2>
+        <div class="space-y-3 md:space-y-4 mb-10">`;
+      if (sorted.length === 0) html += `<div class="text-gray-500 italic">Κανένας παίκτης με βαθμούς...</div>`;
+      sorted.forEach((p, idx) => {
+        const bg = idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-[#cc8fb3]';
+        html += `<div class="flex items-center justify-between bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-100">
+          <div class="flex items-center gap-3 md:gap-4">
+            <span class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${bg}">${idx + 1}</span>
+            <span class="text-xl md:text-2xl font-bold text-gray-800">${escapeHtml(p.name)}</span>
+          </div>
+          <span class="text-xl md:text-2xl font-extrabold text-[#7f265b]">${p.score} pt</span>
+        </div>`;
+      });
+      html += `</div>`;
+      if (!isEnd && isHost) html += `<button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition">Επόμενο</button>`;
+      if (isEnd) html += `<div class="text-gray-500 mt-8 font-medium">Ελπίζουμε να περάσατε bloody awesome!</div>`;
+      html += `</div>`;
+      return html;
+    }
+
+    function renderFull() {
+      const app = document.getElementById('app');
+      const audioContainer = document.getElementById('persistent-audio');
+      const body = document.getElementById('main-body');
+      
+      const currentStep = state.gameDoc && state.gameDoc.currentStepIndex >= 0 ? state.quizData[state.gameDoc.currentStepIndex] : null;
+
+      // Ενημέρωση του χρώματος του Body
+      if (state.view === 'home' || !state.authReady) {
+        body.style.backgroundColor = '#330f25';
+      } else {
+        body.style.backgroundColor = '#f9fafb';
+      }
+
+      // Διασώζουμε το persistent audio ΠΡΙΝ αντικατασταθεί το HTML για να μην σταματήσει η μουσική
+      if (audioContainer && audioContainer.parentNode !== document.body) {
+          document.body.appendChild(audioContainer);
+      }
+
+      let html = '';
+
+      // --- VIEWS ---
+      if (!state.authReady) {
+        html = `<div class="min-h-screen flex items-center justify-center text-white relative z-10 w-full">Φόρτωση...</div>`;
+      }
+      else if (state.view === 'home') {
+        html += `
+          <div class="flex-grow flex flex-col items-center justify-center p-4 text-white relative z-10 w-full">
+            <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden p-8 text-gray-800">
+              <div class="flex justify-center mb-6">
+                <img src="logo.png" alt="LifePulse Logo" class="h-16 object-contain" onerror="this.style.display='none'">
+              </div>
+              <h1 class="text-3xl font-extrabold text-center text-[#330f25] mb-8 tracking-tight">Fang facts</h1>
+              ${state.errorMsg ? `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded"><p>${escapeHtml(state.errorMsg)}</p></div>` : ''}
+              
+              <form onsubmit="actions.joinGame(event)" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">PIN Παιχνιδιού</label>
+                  <input type="text" oninput="actions.setGamePin(event)" value="${escapeHtml(state.gamePin)}" class="w-full text-center text-2xl tracking-widest font-bold px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#7f265b] outline-none transition" placeholder="1234" maxlength="4">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Το Όνομά σου</label>
+                  <input type="text" oninput="actions.setPlayerName(event)" value="${escapeHtml(state.playerName)}" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#7f265b] outline-none transition" placeholder="Πώς σε λένε;" maxlength="15">
+                </div>
+                <button type="submit" class="w-full bg-[#7f265b] hover:bg-[#661e49] text-white font-bold py-4 rounded-xl shadow-md transition-all transform hover:scale-[1.02]">Συμμετοχή</button>
+              </form>
+
+              <div class="mt-8 pt-6 border-t border-gray-200 text-center">
+                <p class="text-sm text-gray-500 mb-4">Θέλεις να οργανώσεις εσύ το παιχνίδι;</p>
+                <!-- Trigger Admin Modal for Create Game -->
+                <button onclick="actions.openAdminModal('createGame')" class="w-full bg-gray-100 hover:bg-[#f1dae7] text-[#661e49] font-bold py-3 rounded-xl transition-colors">Δημιουργία Παιχνιδιού (Host)</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      else if (state.view === 'editor') {
+        html += `
+          <div class="pb-24 min-h-screen w-full relative z-10">
+            <header class="bg-[#330f25] text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+              <div class="flex items-center gap-3">
+                <i data-lucide="edit-3"></i><h1 class="font-bold text-xl hidden sm:block">Επεξεργασία Quiz (Admin)</h1>
+              </div>
+              <div class="flex items-center gap-3">
+                ${state.saveMessage ? `<span class="text-green-300 font-bold text-sm bg-green-900/50 px-3 py-1 rounded-full">${state.saveMessage}</span>` : ''}
+                <button onclick="actions.exportQuizData()" class="bg-[#4d1737] hover:bg-[#1a0813] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition hidden sm:flex"><i data-lucide="code" class="w-4 h-4"></i> Εξαγωγή</button>
+                <button onclick="actions.saveQuiz()" class="bg-[#f1dae7] hover:bg-white text-[#330f25] px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i data-lucide="save" class="w-4 h-4"></i> Αποθήκευση</button>
+                <button onclick="actions.goToLobby()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold transition">Πίσω</button>
+              </div>
+            </header>
+            <div class="max-w-4xl mx-auto mt-8 px-4 space-y-4">
+        `;
+        state.quizData.forEach((item, index) => {
+          html += `<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative group">
+             <div class="absolute right-4 top-4 flex gap-2 opacity-100 sm:opacity-50 group-hover:opacity-100 transition-opacity">
+               <button onclick="actions.moveItem(${index}, -1)" ${index===0?'disabled':''} class="p-2 hover:bg-gray-100 rounded disabled:opacity-30"><i data-lucide="arrow-up" class="w-4 h-4"></i></button>
+               <button onclick="actions.moveItem(${index}, 1)" ${index===state.quizData.length-1?'disabled':''} class="p-2 hover:bg-gray-100 rounded disabled:opacity-30"><i data-lucide="arrow-down" class="w-4 h-4"></i></button>
+               <button onclick="actions.deleteItem(${index})" class="p-2 hover:bg-red-50 text-red-500 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+             </div>
+             <div class="flex items-center gap-2 mb-4">
+               <span class="bg-[#f1dae7] text-[#7f265b] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">${item.type === 'question' ? 'Ερώτηση' : item.type === 'phase_intro' ? 'Εισαγωγή Φάσης' : item.type === 'leaderboard' ? 'Βαθμολογία' : 'Video/Media'}</span>
+               <span class="text-gray-400 font-bold text-sm">#${index + 1}</span>
+             </div>`;
+          
+          if(item.type === 'question') {
+            html += `<div class="space-y-4">
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">Κείμενο Ερώτησης</label><textarea oninput="actions.updateItemField(${index}, 'text', this.value)" class="w-full border rounded-lg p-2 outline-none" rows="2">${escapeHtml(item.text)}</textarea></div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
+            (item.options || []).forEach((opt, oIdx) => {
+              html += `<div class="flex items-center gap-2">
+                <input type="radio" name="correct-${index}" ${item.correct === oIdx ? 'checked' : ''} onchange="actions.updateItemCorrect(${index}, ${oIdx})" class="w-5 h-5 text-[#7f265b]">
+                <input type="text" oninput="actions.updateItemOption(${index}, ${oIdx}, this.value)" value="${escapeHtml(opt)}" class="w-full border p-2 rounded-lg outline-none ${item.correct === oIdx ? 'border-green-500 bg-green-50' : ''}">
+              </div>`;
+            });
+            html += `</div>
+              <div class="flex gap-4">
+                <div class="w-1/3"><label class="block text-xs font-bold text-gray-500 mb-1">Χρόνος (δευτ.)</label><input type="number" oninput="actions.updateItemField(${index}, 'time', parseInt(this.value))" value="${item.time||20}" class="w-full border rounded-lg p-2"></div>
+                <div class="w-2/3"><label class="block text-xs font-bold text-gray-500 mb-1">Αρχείο Ήχου (π.χ. song.mp3)</label><input type="text" oninput="actions.updateItemField(${index}, 'audioUrl', this.value)" value="${escapeHtml(item.audioUrl)}" class="w-full border rounded-lg p-2 text-sm text-gray-600" placeholder="π.χ. song1.mp3"></div>
+              </div>
+            </div>`;
+          } else if(item.type === 'phase_intro') {
+            html += `<div class="space-y-4">
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">Τίτλος</label><input type="text" oninput="actions.updateItemField(${index}, 'title', this.value)" value="${escapeHtml(item.title)}" class="w-full border rounded-lg p-2 font-bold"></div>
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">Υπότιτλος</label><input type="text" oninput="actions.updateItemField(${index}, 'subtitle', this.value)" value="${escapeHtml(item.subtitle)}" class="w-full border rounded-lg p-2"></div>
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">Αρχείο Ήχου (π.χ. song.mp3)</label><input type="text" oninput="actions.updateItemField(${index}, 'audioUrl', this.value)" value="${escapeHtml(item.audioUrl)}" class="w-full border rounded-lg p-2 text-sm"></div>
+            </div>`;
+          } else if(item.type === 'media') {
+             html += `<div class="space-y-4">
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">Τίτλος</label><input type="text" oninput="actions.updateItemField(${index}, 'title', this.value)" value="${escapeHtml(item.title)}" class="w-full border rounded-lg p-2"></div>
+              <div><label class="block text-xs font-bold text-gray-500 mb-1">YouTube Embed URL</label><input type="text" oninput="actions.updateItemField(${index}, 'url', this.value)" value="${escapeHtml(item.url)}" class="w-full border rounded-lg p-2"></div>
+            </div>`;
+          } else if(item.type === 'leaderboard') {
+            html += `<div class="text-gray-500 italic text-sm py-4 text-center border-2 border-dashed rounded-lg bg-gray-50">Εμφάνιση Βαθμολογίας.</div>`;
+          }
+
+          html += `<div class="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-center gap-2">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider mr-2">Προσθηκη:</span>
+            <button onclick="actions.insertItemAfter(${index}, 'question')" class="bg-gray-50 hover:bg-[#f1dae7] text-gray-600 hover:text-[#7f265b] text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Ερώτηση</button>
+            <button onclick="actions.insertItemAfter(${index}, 'phase_intro')" class="bg-gray-50 hover:bg-[#f1dae7] text-gray-600 hover:text-[#7f265b] text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Φάση</button>
+            <button onclick="actions.insertItemAfter(${index}, 'leaderboard')" class="bg-gray-50 hover:bg-[#f1dae7] text-gray-600 hover:text-[#7f265b] text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Σκορ</button>
+            <button onclick="actions.insertItemAfter(${index}, 'media')" class="bg-gray-50 hover:bg-[#f1dae7] text-gray-600 hover:text-[#7f265b] text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Βίντεο / Ήχος</button>
+          </div></div>`;
+        });
+        
+        html += `<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center mb-8">
+            <h3 class="font-bold text-gray-700 mb-4">Προσθήκη Στο Τέλος του Quiz</h3>
+            <div class="flex flex-wrap justify-center gap-3">
+              <button onclick="actions.insertItemAfter(${state.quizData.length - 1}, 'question')" class="bg-[#f1dae7] hover:bg-[#e1b7d0] text-[#7f265b] px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition"><i data-lucide="plus" class="w-4 h-4"></i> Ερώτηση</button>
+              <button onclick="actions.insertItemAfter(${state.quizData.length - 1}, 'phase_intro')" class="bg-[#f1dae7] hover:bg-[#e1b7d0] text-[#7f265b] px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition"><i data-lucide="plus" class="w-4 h-4"></i> Φάση</button>
+              <button onclick="actions.insertItemAfter(${state.quizData.length - 1}, 'leaderboard')" class="bg-[#f1dae7] hover:bg-[#e1b7d0] text-[#7f265b] px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition"><i data-lucide="plus" class="w-4 h-4"></i> Leaderboard</button>
+              <button onclick="actions.insertItemAfter(${state.quizData.length - 1}, 'media')" class="bg-[#f1dae7] hover:bg-[#e1b7d0] text-[#7f265b] px-4 py-2 rounded-lg font-bold flex items-center gap-1 transition"><i data-lucide="plus" class="w-4 h-4"></i> Διάλειμμα Ήχου</button>
+            </div>
+          </div></div></div>`;
+      }
+      else if (state.view === 'host') {
+        if (!state.gameDoc) {
+          html = `<div class="min-h-screen flex items-center justify-center text-gray-600 w-full relative z-10">Φόρτωση...</div>`;
+          app.innerHTML = html;
+          return;
+        }
+
+        const playersList = Object.values(state.gameDoc?.players || {});
+        
+        html += `<div class="min-h-screen flex flex-col relative w-full z-10">`;
+
+        html += `<header class="bg-white/95 backdrop-blur shadow-sm p-4 flex justify-between items-center sticky top-0 z-50">
+          <div class="flex items-center gap-3"><img src="logo.png" onerror="this.style.display='none'" class="h-8"><span class="font-bold text-xl text-gray-800 hidden sm:block">Fang facts - Host</span></div>
+          <div class="bg-[#f1dae7] text-[#4d1737] px-4 py-2 rounded-lg font-bold text-xl tracking-wider">PIN: ${state.gameDoc.pin}</div>
+          <div class="flex items-center gap-2 text-gray-600"><i data-lucide="users"></i><span id="players-count" class="font-bold">${playersList.length}</span></div>
+        </header>
+        <main class="flex-grow p-6 flex flex-col items-center justify-center">`;
+
+        if (state.gameDoc.status === 'lobby') {
+          html += `
+            <div class="text-center max-w-2xl w-full bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl">
+              <h2 class="text-3xl md:text-4xl font-extrabold text-[#330f25] mb-4">Περιμένουμε τους παίκτες...</h2>
+              <p class="text-lg md:text-xl text-gray-600 mb-8">Μπείτε με το PIN: <strong class="text-[#7f265b] text-4xl block mt-2">${state.gameDoc.pin}</strong></p>
+              <div id="lobby-list" class="flex flex-wrap gap-3 justify-center mb-12">`;
+                if(playersList.length === 0) html += `<p class="text-gray-400 italic w-full">Κανείς δεν έχει συνδεθεί ακόμα...</p>`;
+                else playersList.forEach(p => html += `<span class="bg-white shadow-sm border border-gray-200 px-4 py-2 rounded-full text-lg font-medium text-gray-800 animate-pulse-fast">${escapeHtml(p.name)}</span>`);
+          html += `</div>
+              <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button onclick="actions.openAdminModal('editQuiz')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold text-xl shadow-md transition-all flex items-center justify-center gap-2"><i data-lucide="settings"></i> Επεξεργασία Quiz</button>
+                <button id="host-start-btn" onclick="actions.hostNextStep()" class="px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition-all bg-green-500 hover:bg-green-600 text-white transform hover:scale-105">Εκκίνηση Παιχνιδιού!</button>
+              </div>
+            </div>`;
+        } 
+        else if (currentStep?.type === 'phase_intro' && state.gameDoc.status === 'active') {
+           html += `<div class="w-full max-w-5xl text-center bg-white/90 backdrop-blur p-10 rounded-3xl shadow-2xl">
+             <div class="inline-block p-6 bg-[#f1dae7] rounded-full mb-6"><i data-lucide="star" class="w-20 h-20 text-[#7f265b] animate-spin-slow"></i></div>
+             <h2 class="text-4xl md:text-6xl font-extrabold text-[#330f25] mb-4">${escapeHtml(currentStep.title)}</h2>
+             <p class="text-2xl md:text-4xl text-[#7f265b] font-bold mb-8">${escapeHtml(currentStep.subtitle)}</p>
+             
+             <!-- Εδώ θα κουμπώσει το mp3 audio -->
+             <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
+             
+             <button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-10 py-5 rounded-2xl font-bold text-2xl shadow-lg transition transform hover:scale-105">Πάμε στις Ερωτήσεις!</button>
+           </div>`;
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active') {
+          clearInterval(hostTimerInterval);
+          
+          let currentQuestionNum = state.quizData.slice(0, state.gameDoc.currentStepIndex + 1).filter(item => item.type === 'question').length;
+          
+          html += `<div class="w-full max-w-5xl text-center">
+              <div class="mb-8 bg-white/90 backdrop-blur p-6 rounded-3xl shadow-lg">
+                <span class="text-[#7f265b] font-bold mb-2 block uppercase tracking-wider">Ερώτηση ${currentQuestionNum}</span>
+                <h2 class="text-3xl md:text-5xl font-extrabold text-gray-900">${escapeHtml(currentStep.text)}</h2>
+              </div>
+              
+              <!-- Εδώ θα κουμπώσει το mp3 audio -->
+              <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
+              
+              <div class="flex flex-col items-center justify-center mb-8">
+                <div id="host-timer-circle" class="w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-3xl md:text-4xl font-extrabold text-white shadow-lg mb-4 bg-green-500"><span id="host-timer-text"></span></div>
+                <div class="w-full max-w-md bg-gray-200/80 backdrop-blur rounded-full h-3 overflow-hidden"><div id="host-timer-bar" class="h-3 rounded-full bg-green-500" style="width: 100%"></div></div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">`;
+              currentStep.options.forEach((opt, idx) => {
+                html += `<div class="${COLORS[idx]} text-white text-xl md:text-2xl font-bold p-6 md:p-8 rounded-2xl shadow-xl flex items-center justify-start gap-6 min-h-[100px]">
+                  <img src="${SHAPE_IMAGES[idx]}" alt="Option ${idx+1}" class="w-12 h-12 object-contain drop-shadow-md bg-black/10 rounded-full" onerror="this.style.opacity='0'; this.classList.remove('bg-black/10');">
+                  <span>${escapeHtml(opt)}</span>
+                </div>`;
+              });
+          html += `</div>
+              <div class="mt-8 flex flex-col sm:flex-row justify-between items-center bg-white/95 backdrop-blur p-4 rounded-xl shadow-lg gap-4">
+                <div class="text-gray-600 font-medium">Απάντησαν: <span id="answered-count" class="font-bold text-[#7f265b]">${playersList.filter(p=>p.currentAnswer!==-1).length}</span> / ${playersList.length}</div>
+                <button onclick="actions.hostShowAnswer()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-6 py-2 rounded-lg font-bold transition flex items-center gap-2">Παράλειψη Χρόνου <i data-lucide="chevron-right"></i></button>
+              </div>
+            </div>`;
+            setTimeout(() => startHostTimer(state.gameDoc.questionEndTime, currentStep.time), 50);
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'answer') {
+          html += `<div class="w-full max-w-4xl text-center bg-white/90 backdrop-blur p-10 rounded-3xl shadow-2xl">
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-8">Η Σωστή Απάντηση είναι...</h2>
+            <div class="${COLORS[currentStep.correct]} text-white text-3xl md:text-4xl font-extrabold p-8 md:p-12 rounded-3xl shadow-2xl mx-auto mb-12 transform scale-105 animate-pulse-fast flex items-center justify-center gap-6">
+              <img src="${SHAPE_IMAGES[currentStep.correct]}" alt="Correct Option" class="w-16 h-16 object-contain drop-shadow-md" onerror="this.style.display='none';">
+              ${escapeHtml(currentStep.options[currentStep.correct])}
+            </div>
+            <button onclick="actions.hostNextStep()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition transform hover:scale-105">Επόμενο</button>
+          </div>`;
+        }
+        else if (currentStep?.type === 'media' && state.gameDoc.status === 'active') {
+          html += `<div class="w-full max-w-5xl text-center bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl">
+               <h2 class="text-2xl md:text-3xl font-extrabold text-[#330f25] mb-6 flex items-center justify-center gap-3"><i data-lucide="music" class="text-[#7f265b] w-8 h-8"></i> ${escapeHtml(currentStep.title)}</h2>
+               
+               <!-- Εδώ θα κουμπώσει το mp3 audio -->
+               <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
+               
+               <button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition">Συνέχεια Παιχνιδιού</button>
+             </div>`;
+        }
+        else if (currentStep?.type === 'leaderboard' && state.gameDoc.status === 'active') {
+          html += getLeaderboardHtml(playersList, false, true);
+        }
+        else if (state.gameDoc.status === 'end') {
+          html += getLeaderboardHtml(playersList, true, true);
+        }
+
+        html += `</main></div>`;
+      }
+      else if (state.view === 'player') {
+        if (!state.gameDoc) {
+          html = `<div class="min-h-screen flex items-center justify-center text-gray-600 w-full relative z-10">Φόρτωση...</div>`;
+          app.innerHTML = html;
+          return;
+        }
+
+        const myData = state.gameDoc.players[state.user.uid];
+
+        html += `<div class="min-h-screen flex flex-col w-full relative z-10">
+          <header class="bg-white/95 backdrop-blur shadow-sm p-4 flex justify-between items-center sticky top-0 z-50">
+            <span class="font-bold text-gray-800 flex items-center gap-2"><img src="logo.png" onerror="this.style.display='none'" class="h-6"> ${escapeHtml(myData?.name)}</span>
+            <span class="bg-[#f1dae7] text-[#4d1737] px-3 py-1 rounded-full font-bold text-sm shadow-sm">Σκορ: <span id="player-score">${myData?.score || 0}</span></span>
+          </header>
+          <main class="flex-grow flex flex-col justify-center p-4">`;
+
+        if (state.gameDoc.status === 'lobby') {
+          html += `<div class="text-center bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl max-w-sm mx-auto">
+             <div class="inline-block p-6 bg-white rounded-full shadow-lg mb-6 animate-pulse-fast border-4 border-[#f1dae7]"><i data-lucide="check-circle-2" class="w-16 h-16 text-[#7f265b]"></i></div>
+             <h2 class="text-2xl font-bold text-gray-800">Μπήκες επιτυχώς!</h2>
+             <p class="text-gray-500 mt-2">Βλέπε στην κεντρική οθόνη. Περιμένουμε τον Host...</p>
+           </div>`;
+        }
+        else if (currentStep?.type === 'phase_intro' && state.gameDoc.status === 'active') {
+          html += `<div class="text-center bg-[#f9f0f5]/95 backdrop-blur p-8 rounded-3xl border-2 border-[#f1dae7] max-w-sm mx-auto shadow-xl">
+             <i data-lucide="star" class="w-16 h-16 text-[#7f265b] mx-auto mb-4 animate-pulse-fast"></i>
+             <h2 class="text-3xl font-extrabold text-[#330f25] mb-2">${escapeHtml(currentStep.title)}</h2>
+             <p class="text-xl font-bold text-[#7f265b] mb-4">${escapeHtml(currentStep.subtitle)}</p>
+             <p class="text-gray-600 mt-2 font-medium">Ετοιμάσου! Δες την κεντρική οθόνη.</p>
+           </div>`;
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active' && myData?.currentAnswer === -1) {
+          html += `<div class="h-full flex flex-col gap-4 py-4 w-full max-w-lg mx-auto">
+            <div class="flex justify-between items-center bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg mb-2">
+              <span class="font-bold text-gray-500">Χρόνος:</span>
+              <div id="player-timer-box" class="font-extrabold text-xl flex items-center gap-2 text-green-600 bg-gray-50 px-3 py-1 rounded-lg"><i data-lucide="clock" class="w-5 h-5"></i><span id="player-timer-text"></span></div>
+            </div>
+            <div class="bg-white/95 backdrop-blur p-4 rounded-xl shadow-lg text-center font-bold text-gray-700 mb-2 text-lg">${escapeHtml(currentStep.text)}</div>
+            <div class="grid grid-cols-2 gap-4 flex-grow">`;
+            currentStep.options.forEach((opt, idx) => {
+              html += `<button onclick="actions.submitAnswer(${idx})" class="${COLORS[idx]} ${HOVER_COLORS[idx]} text-white rounded-2xl shadow-xl transition-all transform active:scale-95 min-h-[120px] flex flex-col items-center justify-center p-4 gap-3 border-b-4 border-black/20">
+                <img src="${SHAPE_IMAGES[idx]}" alt="Option ${idx+1}" class="w-14 h-14 object-contain drop-shadow-md bg-black/10 rounded-full" onerror="this.style.opacity='0'; this.classList.remove('bg-black/10');">
+                <span class="font-bold text-[15px] sm:text-lg text-center leading-tight">${escapeHtml(opt)}</span>
+              </button>`;
+            });
+          html += `</div></div>`;
+          setTimeout(() => startPlayerTimer(state.gameDoc.questionEndTime), 50);
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active' && myData?.currentAnswer !== -1) {
+          html += `<div class="text-center bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl max-w-sm mx-auto">
+             <div class="inline-block p-6 bg-[#f1dae7] rounded-full mb-6 shadow-sm"><i data-lucide="clock" class="w-16 h-16 text-[#7f265b] animate-spin-slow"></i></div>
+             <h2 class="text-2xl font-bold text-gray-800">Η απάντηση καταγράφηκε!</h2>
+             <p class="text-gray-500 mt-2">Περίμενε να τελειώσει ο χρόνος...</p>
+           </div>`;
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'answer') {
+          const isCorrect = myData?.currentAnswer === currentStep.correct;
+          html += `<div class="text-center p-8 rounded-3xl shadow-2xl text-white max-w-sm mx-auto backdrop-blur ${isCorrect ? 'bg-green-500/95' : 'bg-[#a54a7d]/95'}">
+            ${isCorrect 
+              ? `<i data-lucide="check-circle-2" class="w-20 h-20 mx-auto mb-4"></i><h2 class="text-3xl font-extrabold mb-2">Σωστά!</h2><p class="text-lg opacity-90">Συνέχισε έτσι!</p>`
+              : `<i data-lucide="x-circle" class="w-20 h-20 mx-auto mb-4"></i><h2 class="text-3xl font-extrabold mb-2">Λάθος!</h2><p class="text-lg opacity-90">Κρίμα... Η σωστή απάντηση ήταν: <span class="font-bold underline">${escapeHtml(currentStep.options[currentStep.correct])}</span>.</p>`
+            }
+          </div>`;
+        }
+        else if (currentStep?.type === 'media' && state.gameDoc.status === 'active') {
+          html += `<div class="text-center bg-purple-100/95 backdrop-blur p-8 rounded-3xl shadow-xl max-w-sm mx-auto">
+             <i data-lucide="music" class="w-16 h-16 text-[#7f265b] mx-auto mb-4 animate-bounce"></i>
+             <h2 class="text-2xl font-bold text-[#330f25]">Διάλειμμα για μουσική/βίντεο!</h2><p class="text-[#7f265b] mt-2">Δες την κεντρική οθόνη του Host.</p>
+           </div>`;
+        }
+        else if (state.gameDoc.status === 'end' || currentStep?.type === 'leaderboard') {
+          html += `<div class="text-center bg-[#f1dae7]/95 backdrop-blur p-8 rounded-3xl border-2 border-[#e1b7d0] shadow-xl max-w-sm mx-auto">
+             <i data-lucide="trophy" class="w-16 h-16 text-[#a54a7d] mx-auto mb-4"></i>
+             <h2 class="text-2xl font-bold text-[#330f25]">Βαθμολογία</h2><p class="text-[#7f265b] mt-2">Κοίταξε τη μεγάλη οθόνη για να δεις τη θέση σου!</p>
+           </div>`;
+        }
+
+        html += `</main></div>`;
+      }
+
+      // --- ADMIN OVERLAY MODAL ---
+      if (state.showAdminModal) {
+        html += `
+        <div class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl relative">
+            <button onclick="actions.closeAdminModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800"><i data-lucide="x"></i></button>
+            <div class="mx-auto w-16 h-16 bg-[#f1dae7] rounded-full flex items-center justify-center mb-4"><i data-lucide="lock" class="text-[#7f265b] w-8 h-8"></i></div>
+            <h2 class="text-2xl font-bold text-center text-[#330f25] mb-2">Ασφάλεια</h2>
+            <p class="text-center text-gray-500 mb-6 text-sm">Πληκτρολόγησε τον κωδικό πρόσβασης.</p>
+            ${state.adminError ? `<p class="text-red-500 text-sm mb-4 text-center font-bold">${state.adminError}</p>` : ''}
+            <input type="password" oninput="actions.setAdminPass(event)" onkeydown="actions.checkEnter(event)" class="w-full border-2 border-gray-200 rounded-lg px-4 py-3 mb-6 focus:ring-2 focus:ring-[#7f265b] outline-none text-center text-xl tracking-widest" placeholder="Κωδικός">
+            <button onclick="actions.verifyAdmin()" class="w-full bg-[#7f265b] hover:bg-[#661e49] text-white font-bold py-3 rounded-xl">Είσοδος</button>
+          </div>
+        </div>`;
+      }
+
+      // --- EXPORT MODAL ---
+      if (state.exportText) {
+        html += `
+        <div class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl p-8 max-w-3xl w-full shadow-2xl relative flex flex-col h-[80vh] md:h-[60vh]">
+            <button onclick="actions.closeExportModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800"><i data-lucide="x"></i></button>
+            <h2 class="text-2xl font-bold text-center text-[#330f25] mb-2">Εξαγωγή Κώδικα</h2>
+            <p class="text-gray-600 mb-4 text-sm text-center">Αντέγραψε το παρακάτω κείμενο και αντικατέστησε το μπλοκ <b>const DEFAULT_QUIZ_DATA</b> στον κώδικα (κοντά στη γραμμή 65).</p>
+            <textarea id="export-textarea" class="w-full flex-grow p-4 border-2 border-gray-200 rounded-lg text-sm font-mono bg-gray-50 outline-none resize-none" readonly>${escapeHtml(state.exportText)}</textarea>
+            <button id="copy-btn" onclick="actions.copyExportText()" class="mt-4 w-full bg-[#7f265b] hover:bg-[#661e49] text-white font-bold py-3 rounded-xl">Αντιγραφή στο Πρόχειρο</button>
+          </div>
+        </div>`;
+      }
+
+      app.innerHTML = html;
+      lucide.createIcons();
+
+      // Επανατοποθέτηση του persistent audio στο σωστό slot αν υπάρχει αρχείο ήχου
+      if (audioContainer) {
+          const slot = document.getElementById('audio-slot');
+
+          if (state.view === 'host' && state.gameDoc && state.gameDoc.status !== 'lobby' && currentStep?.audioUrl) {
+             if (slot) slot.appendChild(audioContainer);
+             audioContainer.className = "w-full max-w-md mx-auto my-4 z-20 relative outline-none drop-shadow-lg";
+             
+             // Συγκρίνουμε το URL με αυτό που παίζει ήδη
+             const newUrl = new URL(currentStep.audioUrl, window.location.href).href;
+             if (audioContainer.src !== newUrl) {
+                audioContainer.src = currentStep.audioUrl;
+                audioContainer.play().catch(e => console.warn('Το Autoplay εμποδίστηκε από τον Browser', e));
+             }
+          } else {
+             document.body.appendChild(audioContainer);
+             audioContainer.className = "hidden";
+             if (!currentStep?.audioUrl) {
+               audioContainer.pause();
+               audioContainer.removeAttribute('src'); // Σταματάμε τη μουσική αν πάμε σε ερώτηση χωρίς ήχο
+             }
+          }
+      }
+    }
+
+    // --- TIMERS ---
+    function startHostTimer(endTime, totalTime) {
+      clearInterval(hostTimerInterval);
+      const update = () => {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        const el = document.getElementById('host-timer-text');
+        const bar = document.getElementById('host-timer-bar');
+        const circle = document.getElementById('host-timer-circle');
+        if(!el) return clearInterval(hostTimerInterval);
+        el.innerText = remaining;
+        bar.style.width = ((remaining / totalTime) * 100) + '%';
+        let color = remaining <= 5 ? 'bg-red-500' : remaining <= 10 ? 'bg-yellow-500' : 'bg-green-500';
+        circle.className = `w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-3xl md:text-4xl font-extrabold text-white shadow-lg mb-4 transition-colors duration-500 ${color}`;
+        bar.className = `h-3 rounded-full transition-all duration-500 linear ${color}`;
+        if (remaining <= 0) { clearInterval(hostTimerInterval); if(state.view === 'host') window.actions.hostShowAnswer(); }
+      };
+      update(); hostTimerInterval = setInterval(update, 500);
+    }
+
+    function startPlayerTimer(endTime) {
+      clearInterval(playerTimerInterval);
+      const update = () => {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        const el = document.getElementById('player-timer-text');
+        const box = document.getElementById('player-timer-box');
+        if(!el) return clearInterval(playerTimerInterval);
+        el.innerText = remaining;
+        let color = remaining <= 5 ? 'text-red-600' : remaining <= 10 ? 'text-yellow-600' : 'text-green-600';
+        box.className = `font-extrabold text-xl flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg ${color}`;
+        if (remaining <= 0) clearInterval(playerTimerInterval);
+      };
+      update(); playerTimerInterval = setInterval(update, 500);
+    }
+
+    // --- GRANULAR UPDATES (To prevent iframe reload) ---
+    function updateGranular() {
+      if (state.view === 'host') {
+        const pList = Object.values(state.gameDoc.players || {});
+        const pCountEl = document.getElementById('players-count');
+        if (pCountEl) pCountEl.innerText = pList.length;
+        
+        const ansCountEl = document.getElementById('answered-count');
+        if (ansCountEl) ansCountEl.innerText = pList.filter(p => p.currentAnswer !== -1).length;
+
+        const lobbyListEl = document.getElementById('lobby-list');
+        if (lobbyListEl) {
+          lobbyListEl.innerHTML = pList.length === 0 ? `<p class="text-gray-400 italic w-full">Κανείς δεν έχει συνδεθεί ακόμα...</p>` : pList.map(p => `<span class="bg-white shadow-sm border border-gray-200 px-4 py-2 rounded-full text-lg font-medium text-gray-800 animate-pulse-fast">${escapeHtml(p.name)}</span>`).join('');
+        }
+      } else if (state.view === 'player') {
+         const scoreEl = document.getElementById('player-score');
+         if (scoreEl && state.gameDoc.players[state.user.uid]) {
+            scoreEl.innerText = state.gameDoc.players[state.user.uid].score;
+         }
+      }
+    }
+
+    // Start App
+    init();
+
+  </script>
+</body>
+</html>
