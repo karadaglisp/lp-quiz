@@ -107,10 +107,10 @@
       { type: 'phase_intro', title: 'Φάση 1', subtitle: 'Pop Culture 🎬' },
       { type: 'question', text: 'Στον "Ματωμένο Γάμο του Λόρκα" τι συμβολίζει το αίμα που χύνεται στο τέλος της τραγωδίας;', options: ['Την κάθαρση και την συμφιλίωση των χαρακτήρων μέσω της θυσίας', 'Το αναπόφευκτο του πεπρωμένου και το βίαιο τίμημα του απαγορευμένου πάθους', 'Την οριστική ρήξη των δεσμών ανάμεσα στις δύο αντίπαλες οικογένειες', 'Μια διαφήμιση για εθελοντική αιμοδοσία που μπήκε κατά λάθος στην τελευταία πράξη'], correct: 1, time: 25 },
       { type: 'question', text: 'Από τι φτιάχνεται συνήθως το ψεύτικο αίμα (fake blood) στις περισσότερες ταινίες του Χόλιγουντ σήμερα; 🎬', options: ['Σιρόπι καλαμποκιού και κόκκινο χρώμα', 'Κέτσαπ (κλασικό, φθηνό και αγαπημένο)', 'Σιρόπι γρεναδίνης', 'Χυμό ντομάτας'], correct: 0, time: 20 },
-      { type: 'question', text: 'Το 2019 προστέθηκε στα πληκτρολόγιά μας το emoji με τη "σταγόνα αίματος" 🩸. Για ποιο λόγο έγινε κυρίως η καμπάνια για να μπει; 📱', options: ['Για να "σπάσει" το ταμπού γύρω από την έμμηνο ρύση', 'Για τους φανς των ταινιών τρόμου 👻', 'Για να δείχνουμε ότι κόψαμε το δάχτυλό μας με χαρτί 📄', 'Ήταν μια χορηγία του Ερυθρού Σταυρού 🏥'], correct: 2, time: 20 },
+      { type: 'question', text: 'Το 2019 προστέθηκε στα πληκτρολόγιά μας το emoji με τη "σταγόνα αίματος" 🩸. Για ποιο λόγο έγινε κυρίως η καμπάνια για να μπει; 📱', options: ['Για να "σπάσει" το ταμπού γύρω από την έμμηνο ρύση', 'Για τους φανς των ταινιών τρόμου 👻', 'Για να δείχνουμε ότι κόψαμε το δάχτυλό μας με χαρτί 📄', 'Ήταν μια χορηγία του Ερυθρού Σταυρού 🏥'], correct: 0, time: 20 },
       { type: 'question', text: 'Τι χρώμα ήταν το αίμα του Πετρέλη στο αντίστοιχο τραγούδι; ', options: ['Κόκκινο', 'Μπλε', 'Της αγάπης', 'Του ουρανού'], correct: 3, time: 20 },
       { type: 'question', text: 'Στην ταινία " Οι Πειρατές της Καραϊβικής: Η κατάρα του Μαύρου Μαργαριταριού", τι χρειάζεται για να λυθεί η κατάρα του θυσαυρού των Αζτέκων; 🪙 ', options: ['Να γίνει μαι θυσία αίματος από έναν αθώο στην άκρη του κόσμου', 'Να υπογραφεί όρκος αίματος ανάμεσα στους πειρατές και στο Βρετανικό ναυτικό', 'Να προσφερθεί το αίμα του κλέφτη (ή απογόνου του) ενώ είναι όλα τα νομίσματα του θυσαυρού παρόντα', 'Να πιουν οι πειρατές το αίμα μιας γοργόνας'], correct: 2, time: 20 },
-      { type: 'question', text: 'Σε ποιο διάσημο τραγούδι της η Taylor Swift αναφέρεται σε προδοσία από άλλη pop star;  🎤', options: ['Bad Blood', 'Bloodline', 'Bleeding Love', 'Blood sweat & tears '], correct: 0, time: 20 },
+      { type: 'question', text: 'Σε ποιο διάσημο τραγούδι της η Taylor Swift αναφέρεται σε προδοσία από άλλη pop star;  🎤', options: ['Bloodline', 'Bad Blood', 'Bleeding Love', 'Blood sweat & tears '], correct: 1, time: 20 },
       { type: 'question', text: 'Στα MTV VMA του 2009, ποια pop star σοκάρισε το κοινό όταν κρεμάστηκε στη σκηνή καλυμμένη με ψεύτικο αίμα κατά την εκτέλεση του "Paparazzi"; 📸', options: ['Lady Gaga', 'Madonna', 'Britney Spears', 'Katy Perry'], correct: 0, time: 20 },
 
       { type: 'leaderboard' },
@@ -212,6 +212,21 @@
           } catch (e) {
             state.quizData = JSON.parse(JSON.stringify(DEFAULT_QUIZ_DATA));
           }
+
+          // ΕΛΕΓΧΟΣ ΓΙΑ REFRESH (AUTO-RECONNECT)
+          const savedSession = sessionStorage.getItem('lifepulse_quiz');
+          if (savedSession) {
+            try {
+              const parsed = JSON.parse(savedSession);
+              state.gamePin = parsed.pin;
+              state.view = parsed.view;
+              listenToGame(); // Αυτό θα τραβήξει τα δεδομένα και θα κάνει renderFull()
+              return; // Σταματάμε εδώ για να μην φορτώσει την αρχική οθόνη
+            } catch (e) {
+              sessionStorage.removeItem('lifepulse_quiz');
+            }
+          }
+
           renderFull();
         }
       });
@@ -235,6 +250,10 @@
           state.errorMsg = "Το παιχνίδι δεν βρέθηκε ή τερματίστηκε.";
           state.view = 'home';
           state.gameDoc = null;
+          
+          // ΚΑΘΑΡΙΣΜΟΣ ΣΥΝΕΔΡΙΑΣ
+          sessionStorage.removeItem('lifepulse_quiz');
+          
           renderFull();
         }
       }, (err) => console.error("Firestore error:", err));
@@ -269,6 +288,10 @@
           
           state.gameDoc = gameData;
           state.view = 'player';
+          
+          // ΑΠΟΘΗΚΕΥΣΗ ΣΥΝΕΔΡΙΑΣ
+          sessionStorage.setItem('lifepulse_quiz', JSON.stringify({ pin: state.gamePin, view: 'player' }));
+          
           listenToGame();
           renderFull();
         } catch (err) {
@@ -289,6 +312,10 @@
           state.gamePin = pin;
           state.gameDoc = newGame;
           state.view = 'host';
+          
+          // ΑΠΟΘΗΚΕΥΣΗ ΣΥΝΕΔΡΙΑΣ
+          sessionStorage.setItem('lifepulse_quiz', JSON.stringify({ pin: state.gamePin, view: 'host' }));
+          
           listenToGame();
           renderFull();
         } catch (err) {
