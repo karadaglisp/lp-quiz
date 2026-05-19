@@ -339,8 +339,7 @@
 
       submitAnswer: async (idx) => {
         if (state.view !== 'player' || !state.gameDoc) return;
-        const myData = state.gameDoc.players[state.user.uid];
-        if (myData && myData.currentAnswer !== -1) return; 
+       
 
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin), {
           [`players.${state.user.uid}.currentAnswer`]: idx,
