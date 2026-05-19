@@ -728,29 +728,45 @@
              <p class="text-gray-600 mt-2 font-medium">Ετοιμάσου! Δες την κεντρική οθόνη.</p>
            </div>`;
         }
-        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active' && myData?.currentAnswer === -1) {
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active') {
+          const hasAnswered = myData?.currentAnswer !== -1;
+          
           html += `<div class="h-full flex flex-col gap-4 py-4 w-full max-w-lg mx-auto">
             <div class="flex justify-between items-center bg-white/95 backdrop-blur p-3 rounded-xl shadow-lg mb-2">
               <span class="font-bold text-gray-500">Χρόνος:</span>
               <div id="player-timer-box" class="font-extrabold text-xl flex items-center gap-2 text-green-600 bg-gray-50 px-3 py-1 rounded-lg"><i data-lucide="clock" class="w-5 h-5"></i><span id="player-timer-text"></span></div>
             </div>
-            <div class="bg-white/95 backdrop-blur p-4 rounded-xl shadow-lg text-center font-bold text-gray-700 mb-2 text-lg">${escapeHtml(currentStep.text)}</div>
+            <div class="bg-white/95 backdrop-blur p-4 rounded-xl shadow-lg text-center font-bold text-gray-700 mb-2 text-lg">
+              ${hasAnswered ? '<span class="text-[#7f265b] flex items-center justify-center gap-2"><i data-lucide="check" class="w-5 h-5"></i> Η απάντηση καταγράφηκε!</span>' : escapeHtml(currentStep.text)}
+            </div>
             <div class="grid grid-cols-2 gap-4 flex-grow">`;
+            
             currentStep.options.forEach((opt, idx) => {
-              html += `<button onclick="actions.submitAnswer(${idx})" class="${COLORS[idx]} ${HOVER_COLORS[idx]} text-white rounded-2xl shadow-xl transition-all transform active:scale-95 min-h-[120px] flex flex-col items-center justify-center p-4 gap-3 border-b-4 border-black/20">
+              const isSelected = myData?.currentAnswer === idx;
+              
+              // Ορισμός κλάσεων ανάλογα με το αν έχει απαντήσει και ποια επέλεξε
+              let btnClass = `${COLORS[idx]} text-white rounded-2xl shadow-xl transition-all duration-300 min-h-[120px] flex flex-col items-center justify-center p-4 gap-3 relative overflow-hidden `;
+              
+              if (!hasAnswered) {
+                // Default state (δεν έχει απαντήσει ακόμα)
+                btnClass += `${HOVER_COLORS[idx]} transform active:scale-95 border-b-4 border-black/20`;
+              } else if (isSelected) {
+                // Selected state (έχει απαντήσει και είναι ΑΥΤΗ η επιλογή)
+                btnClass += `border-4 border-white ring-4 ring-[#7f265b] transform scale-105 z-10`;
+              } else {
+                // Unselected state (έχει απαντήσει, αλλά ΔΕΝ είναι αυτή η επιλογή)
+                btnClass += `opacity-40 grayscale transform scale-95`;
+              }
+
+              html += `<button ${hasAnswered ? 'disabled' : `onclick="actions.submitAnswer(${idx})"`} class="${btnClass}">
+                ${isSelected ? `<div class="absolute top-2 right-2 bg-white text-green-500 rounded-full p-1 shadow-md animate-bounce"><i data-lucide="check-circle-2" class="w-6 h-6"></i></div>` : ''}
                 <img src="${SHAPE_IMAGES[idx]}" alt="Option ${idx+1}" class="w-14 h-14 object-contain drop-shadow-md bg-black/10 rounded-full" onerror="this.style.opacity='0'; this.classList.remove('bg-black/10');">
                 <span class="font-bold text-[15px] sm:text-lg text-center leading-tight">${escapeHtml(opt)}</span>
               </button>`;
             });
+            
           html += `</div></div>`;
           setTimeout(() => startPlayerTimer(state.gameDoc.questionEndTime), 50);
-        }
-        else if (currentStep?.type === 'question' && state.gameDoc.status === 'active' && myData?.currentAnswer !== -1) {
-          html += `<div class="text-center bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl max-w-sm mx-auto">
-             <div class="inline-block p-6 bg-[#f1dae7] rounded-full mb-6 shadow-sm"><i data-lucide="clock" class="w-16 h-16 text-[#7f265b] animate-spin-slow"></i></div>
-             <h2 class="text-2xl font-bold text-gray-800">Η απάντηση καταγράφηκε!</h2>
-             <p class="text-gray-500 mt-2">Περίμενε να τελειώσει ο χρόνος...</p>
-           </div>`;
         }
         else if (currentStep?.type === 'question' && state.gameDoc.status === 'answer') {
           const isCorrect = myData?.currentAnswer === currentStep.correct;
