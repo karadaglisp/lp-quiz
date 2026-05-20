@@ -168,7 +168,7 @@
       { type: 'question', text: 'Ποιο ζώο έχει τη μεγαλύτερη καρδιά, με βάρος που φτάνει τα 180 κιλά;', options: ['Η γαλάζια φάλαινα', 'Ο ελέφαντας', 'Ο κροκόδειλος', 'Ο φαλαινοκαρχαρίας'], correct: 0, time: 20, explanationImage: 'whale.jpg' },
       { type: 'question', text: 'Πώς καταφέρνουν τα κουνούπια να πίνουν αίμα χωρίς αυτό να πήζει μέσα στη προβοσκίδα τους; 🦟', options: ['Το σάλιο τους περιέχει αντιπηκτικές ουσίες', 'Το αίμα μας είναι ήδη αρκετά αραιό', 'Η προβοσκίδα τους βυθίζεται αρκετά βαθιά και δεν υπάρχει αυτός ο κίνδυνος', 'Πίνουν μόνο το πλάσμα, το οποίο δεν πήζει'], correct: 0, time: 20 },
       { type: 'question', text: 'Τι χρώμα αίμα έχουν τα χταπόδια; 🐙', options: ['Κόκκινο duh;', 'Μπλε (είναι γαλαζοαίματα)', 'Μαύρο, όπως η ψυχή μου', 'Δεν έχουν καν αίμα'], correct: 1, time: 20},      
-      { type: 'question', text: 'Ο παράγοντας Rhesus (θετικό/αρνητικό στην ομάδα αίματος) πήρε το όνομά του από:', options: ['Τον Ελβετό επιστήμονα Dr. Hans Rhesus', 'Ένα είδος μαϊμούς που χρησιμοποιήθηκε σε μελέτες μετάγγισης αίματος σε κουνέλια', 'Το είδος γουρουνιών Rheysius rubea, γνωστό για το πόσο κοντινή είναι η φυσιολογία του αίματος του με το ανθρώπινο', 'Τον Ρωμαίο γιατρό Aetius Rhesus, που θεωρείται συνεχιστής του Ιπποκράτη'], correct: 1, time: 20, explanationImage: 'monkey.jpg' },
+      { type: 'question', text: 'Ο παράγοντας Rhesus (+/- στην ομάδα αίματος) πήρε το όνομά του από:', options: ['Τον Ελβετό επιστήμονα Dr. Hans Rhesus', 'Ένα είδος μαϊμούς που χρησιμοποιήθηκε σε μελέτες μετάγγισης αίματος σε κουνέλια', 'Το είδος γουρουνιών Rheysius rubea, γνωστό για το πόσο κοντινή είναι η φυσιολογία του αίματος του με το ανθρώπινο', 'Τον Ρωμαίο γιατρό Aetius Rhesus, που θεωρείται συνεχιστής του Ιπποκράτη'], correct: 1, time: 20, explanationImage: 'monkey.jpg' },
       { type: 'question', text: 'Πόσες ομάδες αίματος έχουν οι γάτες;', options: ['8, όπως και οι άνθρωποι', '1, λέγεται ομάδα αίματος Γ', '3: A, B, AB ', '7, όσες και οι ζωές τους'], correct: 2, time: 20 },
       { type: 'question', text: 'Ποια είναι η βασική προϋπόθεση για να γίνει ένας σκύλος εθελοντής αιμοδότης;', options: ['Να έχει πάρει μέρος σε τουλάχιστον μία έκθεση μορφολογίας', 'Να ανήκει σε συγκεκριμένη ράτσα (Golden Retriever)', 'Να είναι πάνω από 25 κιλά και υγιής', 'Να είναι κάτω από 1 έτους'], correct: 2, time: 20 },
 
@@ -529,12 +529,20 @@
       
       sorted.forEach((p, idx) => {
         const bg = idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-[#cc8fb3]';
-        
-        // ΑΝΤΙΣΤΡΟΦΗ ΚΑΘΥΣΤΕΡΗΣΗ ΓΙΑ ΣΑΣΠΕΝΣ: 
-        // Ο τελευταίος (π.χ. 3ος) ξεκινάει στα 0 δευτ. και ο 1ος εμφανίζεται στο τέλος!
-        // Το 0.8s προσθέτει ακριβώς όσο δράμα χρειάζεται.
         const delay = (sorted.length - 1 - idx) * 0.8; 
         
+        // TRIGGER CONFETTI ΓΙΑ ΤΟΝ ΝΙΚΗΤΗ (ΜΟΝΟ ΣΤΟΝ HOST)
+        if (isEnd && idx === 0 && isHost) {
+          setTimeout(() => {
+            confetti({
+              particleCount: 200,
+              spread: 80,
+              origin: { y: 0.6 },
+              colors: ['#7f265b', '#10B981', '#F19821', '#2A48B2', '#ffd700']
+            });
+          }, delay * 1000);
+        }
+
         html += `<div class="flex items-center justify-between bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-100 animate-leaderboard shadow-sm" style="animation-delay: ${delay}s;">
           <div class="flex items-center gap-3 md:gap-4">
             <span class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${bg} shadow-md">${idx + 1}</span>
@@ -547,6 +555,7 @@
       html += `</div>`;
       
       if (!isEnd && isHost) html += `<button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition">Επόμενο</button>`;
+      
       if (isEnd) {
         html += `
           <div class="text-gray-500 mt-8 mb-6 font-medium animate-pulse-fast">Ελπίζουμε να περάσατε bloody awesome! 🩸</div>
@@ -554,7 +563,8 @@
             Παίξε ξανά 🔄
           </button>
         `;
-      }      
+      }
+      
       html += `</div>`;
       return html;
     }
@@ -753,7 +763,7 @@
             <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
 
             <div class="mt-8 text-xl text-gray-500 font-bold flex items-center justify-center gap-3 animate-pulse-fast">
-              <i data-lucide="eye" class="w-8 h-8"></i> Διαβάστε την ερώτηση...
+              <i data-lucide="eye" class="w-8 h-8"></i> Διάβασε την ερώτηση...
             </div>
             
             <div class="w-full max-w-md mx-auto mt-8 bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -906,7 +916,8 @@
               if (!hasAnswered) {
                 btnClass += `${HOVER_COLORS[idx]} transform active:scale-95 border-b-4 border-black/20`;
               } else if (isSelected) {
-                btnClass += `border-4 border-white ring-4 ring-[#7f265b] transform scale-105 z-10`;
+                const ringColor = COLORS[idx].replace('bg-', 'ring-'); 
+                btnClass += `border-none ${ringColor} ring-4 ring-offset-4 ring-offset-white/90 transform scale-105 z-10`;
               } else {
                 btnClass += `opacity-40 grayscale transform scale-95`;
               }
