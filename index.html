@@ -111,6 +111,12 @@
       'hover:bg-[#d97706]', 
       'hover:bg-[#1e3a8a]'  
     ];
+    const RING_COLORS = [
+      'ring-[#7F265B]', 
+      'ring-[#10B981]', 
+      'ring-[#F19821]', 
+      'ring-[#2A48B2]'
+    ];
     const SHAPE_IMAGES = [
       'knife.png', 
       'hawk.png', 
@@ -916,8 +922,8 @@
               if (!hasAnswered) {
                 btnClass += `${HOVER_COLORS[idx]} transform active:scale-95 border-b-4 border-black/20`;
               } else if (isSelected) {
-                const ringColor = COLORS[idx].replace('bg-', 'ring-'); 
-                btnClass += `border-none ${ringColor} ring-4 ring-offset-4 ring-offset-white/90 transform scale-105 z-10`;
+                // Χρησιμοποιούμε τον έτοιμο πίνακα RING_COLORS
+                btnClass += `border-none ${RING_COLORS[idx]} ring-4 ring-offset-4 ring-offset-[#f9fafb] transform scale-105 z-10`;
               } else {
                 btnClass += `opacity-40 grayscale transform scale-95`;
               }
