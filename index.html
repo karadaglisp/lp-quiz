@@ -51,6 +51,12 @@
       opacity: 0; /* Ξεκινάει κρυμμένο */
       animation: slide-up-fade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
+
+    /* Animation για την μπάρα φόρτωσης της ερώτησης */
+    @keyframes load-bar {
+      0% { width: 0%; }
+      100% { width: 100%; }
+    }
   </style>
 </head>
 <body id="main-body" class="transition-colors duration-500 flex flex-col min-h-screen overflow-x-hidden bg-[#330f25]">
@@ -81,7 +87,7 @@
     // --- FIREBASE IMPORTS ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // --- SETUP ---
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
@@ -346,13 +352,31 @@
         const updates = { currentStepIndex: nextIndex, status: 'active' };
 
         if (nextStepData.type === 'question') {
-          updates.questionStartTime = Date.now();
-          updates.questionEndTime = Date.now() + ((nextStepData.time || 20) * 1000);
+          // 1. Βάζουμε το status σε "show_question" αντί για "active"
+          updates.status = 'show_question'; 
           Object.keys(state.gameDoc.players || {}).forEach(uid => {
             updates[`players.${uid}.currentAnswer`] = -1;
             updates[`players.${uid}.answerTime`] = 0;
           });
+          
+          await updateDoc(gameRef, updates);
+          
+          // 2. Ο Host τρέχει ένα κρυφό ρολόι 5 δευτερολέπτων 
+          clearTimeout(window.questionDelayTimer);
+          window.questionDelayTimer = setTimeout(async () => {
+             // Όταν περάσουν τα 5 δευτερόλεπτα, εμφανίζουμε τις απαντήσεις!
+             const currentSnap = await getDoc(gameRef);
+             if (currentSnap.exists() && currentSnap.data().status === 'show_question') {
+                 await updateDoc(gameRef, {
+                    status: 'active',
+                    questionStartTime: Date.now(),
+                    questionEndTime: Date.now() + ((nextStepData.time || 20) * 1000)
+                 });
+             }
+          }, 5000); // 5000 ms = 5 δευτερόλεπτα
+          return;
         }
+        
         await updateDoc(gameRef, updates);
       },
 
@@ -463,6 +487,26 @@
         renderFull();
       },
       resetGame: () => {
+        sessionStorage.removeItem('lifepulse_quiz');
+        state.view = 'home';
+        state.gamePin = '';
+        state.gameDoc = null;
+        renderFull();
+      },
+      terminateGame: async () => {
+        const confirmExit = confirm("Είστε σίγουροι ότι θέλετε να τερματίσετε το παιχνίδι; Όλοι οι παίκτες θα αποσυνδεθούν αμέσως και το δωμάτιο θα κλείσει.");
+        if (!confirmExit) return;
+
+        if (state.gamePin) {
+          try {
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', state.gamePin);
+            await deleteDoc(gameRef); // Διαγράφει το παιχνίδι από τη βάση, πετώντας έξω τους παίκτες
+          } catch (err) {
+            console.error("Σφάλμα κατά τον τερματισμό:", err);
+          }
+        }
+
+        // Καθαρισμός μνήμης και επιστροφή στην αρχική
         sessionStorage.removeItem('lifepulse_quiz');
         state.view = 'home';
         state.gamePin = '';
@@ -663,7 +707,12 @@
         html += `<header class="bg-white/95 backdrop-blur shadow-sm p-4 flex justify-between items-center sticky top-0 z-50">
           <div class="flex items-center gap-3"><img src="logo.png" onerror="this.style.display='none'" class="h-8"><span class="font-bold text-xl text-gray-800 hidden sm:block">Fang facts - Host</span></div>
           <div class="bg-[#f1dae7] text-[#4d1737] px-4 py-2 rounded-lg font-bold text-xl tracking-wider">PIN: ${state.gameDoc.pin}</div>
-          <div class="flex items-center gap-2 text-gray-600"><i data-lucide="users"></i><span id="players-count" class="font-bold">${playersList.length}</span></div>
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-gray-600"><i data-lucide="users"></i><span id="players-count" class="font-bold">${playersList.length}</span></div>
+            <button onclick="actions.terminateGame()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold text-sm flex items-center gap-1 transition-colors shadow-sm border border-red-200">
+              <i data-lucide="log-out" class="w-4 h-4"></i> Έξοδος
+            </button>
+          </div>
         </header>
         <main class="flex-grow p-6 flex flex-col items-center justify-center">`;
 
@@ -692,6 +741,34 @@
              <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
              
              <button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-10 py-5 rounded-2xl font-bold text-2xl shadow-lg transition transform hover:scale-105">Πάμε στις Ερωτήσεις!</button>
+           </div>`;
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'show_question') {
+          let currentQuestionNum = state.quizData.slice(0, state.gameDoc.currentStepIndex + 1).filter(item => item.type === 'question').length;
+          
+          html += `<div class="w-full max-w-5xl text-center bg-white/90 backdrop-blur p-10 rounded-3xl shadow-2xl animate-leaderboard">
+            <span class="text-[#7f265b] font-bold mb-4 block uppercase tracking-widest text-xl">Ερώτηση ${currentQuestionNum}</span>
+            <h2 class="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-8">${escapeHtml(currentStep.text)}</h2>
+            
+            <div id="audio-slot" class="w-full mb-8 flex justify-center"></div>
+
+            <div class="mt-8 text-xl text-gray-500 font-bold flex items-center justify-center gap-3 animate-pulse-fast">
+              <i data-lucide="eye" class="w-8 h-8"></i> Διαβάστε την ερώτηση...
+            </div>
+            
+            <div class="w-full max-w-md mx-auto mt-8 bg-gray-200 rounded-full h-2 overflow-hidden">
+               <div class="bg-[#7f265b] h-2 rounded-full" style="animation: load-bar 5s linear forwards;"></div>
+            </div>
+          </div>`;
+        }
+        else if (currentStep?.type === 'question' && state.gameDoc.status === 'show_question') {
+          html += `<div class="text-center bg-white/90 backdrop-blur p-8 rounded-3xl shadow-xl max-w-sm mx-auto animate-leaderboard">
+             <i data-lucide="eye" class="w-16 h-16 text-[#7f265b] mx-auto mb-4 animate-pulse"></i>
+             <h2 class="text-2xl font-bold text-gray-800 mb-2">Ετοιμάσου!</h2>
+             <p class="text-gray-500 mt-2">Διάβασε την ερώτηση στη μεγάλη οθόνη...</p>
+             <div class="w-full mt-6 bg-gray-200 rounded-full h-2 overflow-hidden">
+               <div class="bg-[#7f265b] h-2 rounded-full" style="animation: load-bar 5s linear forwards;"></div>
+             </div>
            </div>`;
         }
         else if (currentStep?.type === 'question' && state.gameDoc.status === 'active') {
