@@ -461,6 +461,13 @@
         }
         state.quizData.splice(idx + 1, 0, newItem);
         renderFull();
+      },
+      resetGame: () => {
+        sessionStorage.removeItem('lifepulse_quiz');
+        state.view = 'home';
+        state.gamePin = '';
+        state.gameDoc = null;
+        renderFull();
       }
     };
 
@@ -496,8 +503,14 @@
       html += `</div>`;
       
       if (!isEnd && isHost) html += `<button onclick="actions.hostNextStep()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition">Επόμενο</button>`;
-      if (isEnd) html += `<div class="text-gray-500 mt-8 font-medium animate-pulse-fast">Ελπίζουμε να περάσατε bloody awesome! 🩸</div>`;
-      
+      if (isEnd) {
+        html += `
+          <div class="text-gray-500 mt-8 mb-6 font-medium animate-pulse-fast">Ελπίζουμε να περάσατε bloody awesome! 🩸</div>
+          <button onclick="actions.resetGame()" class="bg-[#7f265b] hover:bg-[#661e49] text-white px-8 py-4 rounded-xl font-bold text-xl shadow-lg transition transform hover:scale-105 flex items-center gap-2 mx-auto">
+            Παίξε ξανά 🔄
+          </button>
+        `;
+      }      
       html += `</div>`;
       return html;
     }
@@ -817,10 +830,21 @@
              <h2 class="text-2xl font-bold text-[#330f25]">Διάλειμμα για μουσική/βίντεο!</h2><p class="text-[#7f265b] mt-2">Δες την κεντρική οθόνη του Host.</p>
            </div>`;
         }
-        else if (state.gameDoc.status === 'end' || currentStep?.type === 'leaderboard') {
+        else if (state.gameDoc.status === 'end') {
+          html += `<div class="text-center bg-[#f1dae7]/95 backdrop-blur p-8 rounded-3xl border-2 border-[#e1b7d0] shadow-xl max-w-sm mx-auto">
+             <i data-lucide="trophy" class="w-16 h-16 text-[#a54a7d] mx-auto mb-4 animate-bounce"></i>
+             <h2 class="text-2xl font-bold text-[#330f25]">Τέλος Παιχνιδιού!</h2>
+             <p class="text-[#7f265b] mt-2 mb-6">Κοίταξε τη μεγάλη οθόνη για να δεις την τελική σου θέση!</p>
+             <button onclick="actions.resetGame()" class="w-full bg-[#7f265b] hover:bg-[#661e49] text-white font-bold py-3 rounded-xl shadow-md transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
+               Παίξε ξανά 🔄
+             </button>
+           </div>`;
+        }
+        else if (currentStep?.type === 'leaderboard') {
           html += `<div class="text-center bg-[#f1dae7]/95 backdrop-blur p-8 rounded-3xl border-2 border-[#e1b7d0] shadow-xl max-w-sm mx-auto">
              <i data-lucide="trophy" class="w-16 h-16 text-[#a54a7d] mx-auto mb-4"></i>
-             <h2 class="text-2xl font-bold text-[#330f25]">Βαθμολογία</h2><p class="text-[#7f265b] mt-2">Κοίταξε τη μεγάλη οθόνη για να δεις τη θέση σου!</p>
+             <h2 class="text-2xl font-bold text-[#330f25]">Βαθμολογία</h2>
+             <p class="text-[#7f265b] mt-2">Κοίταξε τη μεγάλη οθόνη για να δεις τη θέση σου!</p>
            </div>`;
         }
 
